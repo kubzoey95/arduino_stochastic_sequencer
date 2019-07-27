@@ -2,12 +2,12 @@
 #define NO_STEPS 16
 #define MAX_PROB 100
 #define NO_NOTE -1
-#define VALUE_INPUT 1
+#define MODE_INPUT 1
 #define NEXT_INPUT 2
 #define PREVIOUS_INPUT 3
 #define TRACK_CHANGE_INPUT 4
-#define MODE_INPUT 5
-#define NO_OF_BTNS 5
+#define VALUE_INPUT 5
+#define NO_OF_BTNS 4
 
 class Sequencer
 {
@@ -171,21 +171,22 @@ public:
   }
 
   void maybeChangeMode(){
-    if(analogRead(MODE_INPUT) > 800){
+    int mode[] = {MODE_INPUT};
+    if(this->btnComboReady(mode, 1)){
       this->switchEditsProb();
     }
   }
 
   void maybeProbEdit(){
     if(this->edits_prob){
-      
+      this->probs[this->curr_edit_track][this->curr_edit_step] = ((float)analogRead(VALUE_INPUT) / 1024.) * 100.;
     }
     // read prob and set in current position
   }
 
   void maybeNoteEdit(){
     if(!this->edits_prob){
-      // read note and set in current position
+      this->sequence[this->curr_edit_track][this->curr_edit_step] = (int)(((float)analogRead(VALUE_INPUT) / 1024.) * 88.);
     }
   }
   
