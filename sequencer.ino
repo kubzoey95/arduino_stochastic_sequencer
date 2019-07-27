@@ -1,7 +1,7 @@
 #define NO_TRACKS 4
 #define NO_STEPS 16
 #define MAX_PROB 100
-#define NO_NOTE -1
+#define EMPTY_NOTE -1
 #define MODE_INPUT 1
 #define NEXT_INPUT 2
 #define PREVIOUS_INPUT 3
@@ -23,25 +23,31 @@ private:
   bool plays;
   bool edits_prob;
   bool button_pushd;
-  int button_wait;
+  long button_wait;
   int button_waited;
   bool buttons_stats[NO_OF_BTNS] = {false};
   bool any_pushd = false;
   long last_btn_push_time;
+  int bpm = 120;
+  long beat_time_long;
 public:
   Sequencer(){
-//    this->sequence = {{0}};
-//    this->probs = {{0}};
-//    this->track_on = {true};
+    this->beat_time_long = micros();
+    this->last_btn_push_time = micros();
     this->no_steps = NO_STEPS;
     this->no_tracks = NO_TRACKS;
+    for(int i=0;i<NO_TRACKS;i++){
+      for(int j=0;i<NO_STEPS;j++){
+        this->sequence[i][j] = EMPTY_NOTE;
+      }
+    }
     this->curr_pos = 0;
     this->curr_edit_track = 0;
     this->curr_edit_step = 0;
     this->plays = false;
     this->edits_prob = false;
     this->button_pushd = false;
-    this->button_wait = 500;
+    this->button_wait = 500000;
     this->button_waited = 0;
     }
   void setSequenceAt(int track, int st, int value){
@@ -65,9 +71,9 @@ public:
     }
   }
 
-  int nextStep(){
+  void nextStep(){
     this->curr_pos = (this->curr_pos + 1) % this->no_steps;
-    return this->curr_pos;
+    this->beat_time_long = micros();
   }
 
   int resetStep(){
@@ -77,12 +83,15 @@ public:
 
   void switchPlays(){
     this->plays = !(this->plays);
+    this->beat_time_long = micros();
   }
 
   void maybePlay(){
     if(this->plays){
-      // play midi
-      this->nextStep();
+      if(this->beat_time_long - micros() >= (60. / (float)this->bpm) * 1000000.){
+        // send midi
+        this->nextStep();
+      }
       }
   }
 
@@ -93,6 +102,10 @@ public:
   int editTrackNext(){
     this->curr_edit_track = (this->curr_edit_track + 1) % this->no_tracks;
     return this->curr_edit_track;
+  }
+
+  void switchEditTrack(){
+    this->track_on[this->curr_edit_track] = !this->track_on;
   }
 
   int editStepNext(){
@@ -156,7 +169,12 @@ public:
     this->button_pushd = true;
     return true;
   }
-
+  void maybeNextTrack(){
+    int next[1] = {TRACK_CHANGE_INPUT};
+    if(this->btnComboReady(next, 1)){
+      this->editTrackNext();
+    }
+  }
   void maybeNextBack(){
     int next[] = {NEXT_INPUT};
     int prev[] = {PREVIOUS_INPUT};
@@ -181,7 +199,6 @@ public:
     if(this->edits_prob){
       this->probs[this->curr_edit_track][this->curr_edit_step] = ((float)analogRead(VALUE_INPUT) / 1024.) * 100.;
     }
-    // read prob and set in current position
   }
 
   void maybeNoteEdit(){
@@ -206,4 +223,5 @@ void loop() {
   seq->maybeNoteEdit();
   seq->maybeProbEdit();
   seq->maybeNextBack();
+  seq->maybeNextTrack();
 }
