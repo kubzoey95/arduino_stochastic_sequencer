@@ -14,6 +14,7 @@ class Sequencer
 private:
   int sequence[NO_TRACKS][NO_STEPS] = {{0}};
   int probs[NO_TRACKS][NO_STEPS] = {{0}};
+  int velos[NO_TRACKS][NO_STEPS] = {{127}};
   bool track_on[NO_TRACKS] = {true};
   int no_steps;
   int no_tracks;
@@ -39,6 +40,11 @@ public:
     for(int i=0;i<NO_TRACKS;i++){
       for(int j=0;i<NO_STEPS;j++){
         this->sequence[i][j] = EMPTY_NOTE;
+      }
+    }
+    for(int i=0;i<NO_TRACKS;i++){
+      for(int j=0;i<NO_STEPS;j++){
+        this->velos[i][j] = 127;
       }
     }
     this->curr_pos = 0;
@@ -70,26 +76,52 @@ public:
       return -1;
     }
   }
+  void noteOn(int pitch, int velocity) {
+    Serial.write(144);
+    Serial.write(pitch);
+    Serial.write(velocity);
+  }
+  void noteOff(int pitch, int velocity){
+    Serial.write(128);
+    Serial.write(pitch);
+    Serial.write(velocity);
+  }
 
   void nextStep(){
     this->curr_pos = (this->curr_pos + 1) % this->no_steps;
+    for(int i=0;i<this->no_tracks;i++){
+      this->noteOn(this->sequence[i][this->curr_pos], this->velos[i][this->curr_pos]);
+    }
     this->beat_time_long = micros();
   }
 
   int resetStep(){
+    for(int i=0;i<this->no_tracks;i++){
+          this->noteOff(this->sequence[i][this->curr_pos], this->velos[i][this->curr_pos]);
+        }
     this->curr_pos = 0;
+    for(int i=0;i<this->no_tracks;i++){
+      this->noteOn(this->sequence[i][this->curr_pos], this->velos[i][this->curr_pos]);
+    }
     return this->curr_pos;
   }
 
   void switchPlays(){
     this->plays = !(this->plays);
+    if (this->plays){
+      for(int i=0;i<this->no_tracks;i++){
+        this->noteOn(this->sequence[i][this->curr_pos],this->velos[i][this->curr_pos]);
+      }
+    }
     this->beat_time_long = micros();
   }
-
+  
   void maybePlay(){
     if(this->plays){
       if(this->beat_time_long - micros() >= (60. / (float)this->bpm) * 1000000.){
-        // send midi
+        for(int i=0;i<this->no_tracks;i++){
+          this->noteOff(this->sequence[i][this->curr_pos], this->velos[i][this->curr_pos]);
+        }
         this->nextStep();
       }
       }
@@ -176,8 +208,8 @@ public:
     }
   }
   void maybeNextBack(){
-    int next[] = {NEXT_INPUT};
-    int prev[] = {PREVIOUS_INPUT};
+    int next[1] = {NEXT_INPUT};
+    int prev[1] = {PREVIOUS_INPUT};
     if(this->btnComboReady(next, 1)){
       this->editStepNext();
       return;
@@ -213,6 +245,7 @@ Sequencer *seq;
 
 
 void setup() {
+  Serial.begin(31250);
   seq = new Sequencer();
 }
 
