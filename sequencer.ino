@@ -66,14 +66,14 @@ public:
     this->track_on[track] = value;
   }
 
-  int getNoteAt(int track, int st){
+  bool getNotePlayedAt(int track, int st){
     randomSeed(analogRead(0));
     long randNumber = random(101);
     if(track_on[track] && randNumber >= this->probs[track][st]){
-      return this->sequence[track][st];
+      return true;
     }
     else{
-      return -1;
+      return false;
     }
   }
   void noteOn(int pitch, int velocity) {
@@ -87,31 +87,37 @@ public:
     Serial.write(velocity);
   }
 
+  void scheduleNotesOn(){
+    for(int i=0;i<this->no_tracks;i++){
+      if (this->getNotePlayedAt(i, this->curr_pos)){
+        this->noteOn(this->sequence[i][this->curr_pos], this->velos[i][this->curr_pos]);
+      }
+    }
+  }
+
+  void scheduleNotesOff(){
+    for(int i=0;i<this->no_tracks;i++){
+      this->noteOff(this->sequence[i][this->curr_pos], this->velos[i][this->curr_pos]);
+    }
+  }
+
   void nextStep(){
     this->curr_pos = (this->curr_pos + 1) % this->no_steps;
-    for(int i=0;i<this->no_tracks;i++){
-      this->noteOn(this->sequence[i][this->curr_pos], this->velos[i][this->curr_pos]);
-    }
+    this->scheduleNotesOn();
     this->beat_time_long = micros();
   }
 
   int resetStep(){
-    for(int i=0;i<this->no_tracks;i++){
-          this->noteOff(this->sequence[i][this->curr_pos], this->velos[i][this->curr_pos]);
-        }
+    this->scheduleNotesOff();
     this->curr_pos = 0;
-    for(int i=0;i<this->no_tracks;i++){
-      this->noteOn(this->sequence[i][this->curr_pos], this->velos[i][this->curr_pos]);
-    }
+    this->scheduleNotesOn();
     return this->curr_pos;
   }
 
   void switchPlays(){
     this->plays = !(this->plays);
     if (this->plays){
-      for(int i=0;i<this->no_tracks;i++){
-        this->noteOn(this->sequence[i][this->curr_pos],this->velos[i][this->curr_pos]);
-      }
+      this->scheduleNotesOn();
     }
     this->beat_time_long = micros();
   }
@@ -119,9 +125,7 @@ public:
   void maybePlay(){
     if(this->plays){
       if(this->beat_time_long - micros() >= (60. / (float)this->bpm) * 1000000.){
-        for(int i=0;i<this->no_tracks;i++){
-          this->noteOff(this->sequence[i][this->curr_pos], this->velos[i][this->curr_pos]);
-        }
+        this->scheduleNotesOff();
         this->nextStep();
       }
       }
