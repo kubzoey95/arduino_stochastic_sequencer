@@ -13,7 +13,7 @@ class Sequencer
 {
 private:
   int sequence[NO_TRACKS][NO_STEPS] = {{0}};
-  int probs[NO_TRACKS][NO_STEPS] = {{0}};
+  int probs[NO_TRACKS][NO_STEPS] = {{50}};
   int velos[NO_TRACKS][NO_STEPS] = {{127}};
   bool track_on[NO_TRACKS] = {true};
   int no_steps;
@@ -37,13 +37,14 @@ public:
     this->last_btn_push_time = micros();
     this->no_steps = NO_STEPS;
     this->no_tracks = NO_TRACKS;
+    
     for(int i=0;i<NO_TRACKS;i++){
-      for(int j=0;i<NO_STEPS;j++){
+      for(int j=0;j<NO_STEPS;j++){
         this->sequence[i][j] = EMPTY_NOTE;
       }
     }
     for(int i=0;i<NO_TRACKS;i++){
-      for(int j=0;i<NO_STEPS;j++){
+      for(int j=0;j<NO_STEPS;j++){
         this->velos[i][j] = 127;
       }
     }
@@ -69,7 +70,8 @@ public:
   bool getNotePlayedAt(int track, int st){
     randomSeed(analogRead(0));
     long randNumber = random(101);
-    if(track_on[track] && randNumber >= this->probs[track][st]){
+    Serial.println(randNumber);
+    if(track_on[track] && randNumber < this->probs[track][st]){
       return true;
     }
     else{
@@ -120,11 +122,12 @@ public:
       this->scheduleNotesOn();
     }
     this->beat_time_long = micros();
+    Serial.println(this->beat_time_long - micros());
   }
   
   void maybePlay(){
     if(this->plays){
-      if(this->beat_time_long - micros() >= (60. / (float)this->bpm) * 1000000.){
+      if(micros() - this->beat_time_long >= 60000000. / (float)this->bpm){
         this->scheduleNotesOff();
         this->nextStep();
       }
@@ -249,8 +252,10 @@ Sequencer *seq;
 
 
 void setup() {
-  Serial.begin(31250);
+  Serial.begin(9600);
+  Serial.println("begin");
   seq = new Sequencer();
+  seq->switchPlays();
 }
 
 void loop() {
