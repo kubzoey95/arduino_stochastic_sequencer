@@ -8,28 +8,74 @@
 #define TRACK_CHANGE_INPUT 4
 #define VALUE_INPUT 5
 #define NO_OF_BTNS 4
+#define NO_MODES 3
+#define NOTE_CHANGE_MODE 0
+#define PROB_CHANGE_MODE 1
+#define TEMPO_CHANGE_MODE 2
+
+class Step
+{
+  private:
+    int note = -1;
+    int prob = 100;
+    int velo = 127;
+  public:
+    int getNotePlayed(){
+
+      if (this->note == -1){
+        return -1;
+      }
+
+      randomSeed(analogRead(0) + micros());
+      long randNumber = random(101);
+      Serial.println(randNumber);
+      if(randNumber < this->prob){
+        return this->note;
+      }
+      else{
+        return -1;
+      }
+    }
+};
+
+class Track
+{
+  private:
+    bool on = true;
+    int channel = 0;
+    int no_steps = NO_STEPS;
+    Step* steps[NO_STEPS];
+  public:
+    void switchTrack(){
+      this->on = !this->on;
+    }
+    void setChannel(int channel){
+      this->channel = channel;
+    }
+};
 
 class Sequencer
 {
 private:
-  int sequence[NO_TRACKS][NO_STEPS] = {{0}};
+  int sequence[NO_TRACKS][NO_STEPS] = {{EMPTY_NOTE}};
   int probs[NO_TRACKS][NO_STEPS] = {{50}};
   int velos[NO_TRACKS][NO_STEPS] = {{127}};
   bool track_on[NO_TRACKS] = {true};
+  int tracks_channels[NO_TRACKS] = {0};
   int no_steps;
   int no_tracks;
   int curr_pos;
   int curr_edit_track;
   int curr_edit_step;
   bool plays;
-  bool edits_prob;
+  int mode;
   bool button_pushd;
   long button_wait;
   int button_waited;
   bool buttons_stats[NO_OF_BTNS] = {false};
   bool any_pushd = false;
   long last_btn_push_time;
-  int bpm = 120;
+  int bpm = 60;
   long beat_time_long;
 public:
   Sequencer(){
@@ -52,7 +98,7 @@ public:
     this->curr_edit_track = 0;
     this->curr_edit_step = 0;
     this->plays = false;
-    this->edits_prob = false;
+    this->mode = false;
     this->button_pushd = false;
     this->button_wait = 500000;
     this->button_waited = 0;
@@ -68,9 +114,15 @@ public:
   }
 
   bool getNotePlayedAt(int track, int st){
+    if (this->sequence[track][st] == -1){
+      return false;
+    }
     randomSeed(analogRead(0));
     long randNumber = random(101);
     Serial.println(randNumber);
+    Serial.println(this->sequence[track][st]);
+    Serial.println(track);
+    Serial.println(st);
     if(track_on[track] && randNumber < this->probs[track][st]){
       return true;
     }
@@ -78,13 +130,13 @@ public:
       return false;
     }
   }
-  void noteOn(int pitch, int velocity) {
-    Serial.write(144);
+  void noteOn(int channel, int pitch, int velocity) {
+    Serial.write(144 + channel);
     Serial.write(pitch);
     Serial.write(velocity);
   }
-  void noteOff(int pitch, int velocity){
-    Serial.write(128);
+  void noteOff(int channel, int pitch, int velocity){
+    Serial.write(128 + channel);
     Serial.write(pitch);
     Serial.write(velocity);
   }
@@ -92,18 +144,19 @@ public:
   void scheduleNotesOn(){
     for(int i=0;i<this->no_tracks;i++){
       if (this->getNotePlayedAt(i, this->curr_pos)){
-        this->noteOn(this->sequence[i][this->curr_pos], this->velos[i][this->curr_pos]);
+        this->noteOn(this->tracks_channels[i], this->sequence[i][this->curr_pos], this->velos[i][this->curr_pos]);
       }
     }
   }
 
   void scheduleNotesOff(){
     for(int i=0;i<this->no_tracks;i++){
-      this->noteOff(this->sequence[i][this->curr_pos], this->velos[i][this->curr_pos]);
+      this->noteOff(this->tracks_channels[i], this->sequence[i][this->curr_pos], this->velos[i][this->curr_pos]);
     }
   }
 
   void nextStep(){
+    Serial.println("bang");
     this->curr_pos = (this->curr_pos + 1) % this->no_steps;
     this->scheduleNotesOn();
     this->beat_time_long = micros();
@@ -134,8 +187,8 @@ public:
       }
   }
 
-  void switchEditsProb(){
-    this->edits_prob = !(this->edits_prob);
+  void switchMode(){
+    this->mode = (this->mode + 1) % NO_MODES;
   }
 
   int editTrackNext(){
@@ -148,12 +201,12 @@ public:
   }
 
   int editStepNext(){
-    this->curr_edit_step = (this->curr_edit_step + 1) % this->no_tracks;
+    this->curr_edit_step = (this->curr_edit_step + 1) % this->no_steps;
     return this->curr_edit_step;
   }
 
   int editStepPrevious(){
-    this->curr_edit_step = (this->curr_edit_step - 1) % this->no_tracks;
+    this->curr_edit_step = (this->curr_edit_step - 1) % this->no_steps;
     return this->curr_edit_step;
   }
 
@@ -208,10 +261,17 @@ public:
     this->button_pushd = true;
     return true;
   }
+  
   void maybeNextTrack(){
     int next[1] = {TRACK_CHANGE_INPUT};
     if(this->btnComboReady(next, 1)){
       this->editTrackNext();
+    }
+  }
+  void maybeSwitchPlays(){
+    int switch_plays[2] = {NEXT_INPUT, PREVIOUS_INPUT};
+    if(this->btnComboReady(switch_plays, 2)){
+      this->switchPlays();
     }
   }
   void maybeNextBack(){
@@ -226,23 +286,29 @@ public:
       return;
     }
   }
-
   void maybeChangeMode(){
     int mode[] = {MODE_INPUT};
     if(this->btnComboReady(mode, 1)){
-      this->switchEditsProb();
+      Serial.println("mode changed");
+      this->switchMode();
     }
   }
 
   void maybeProbEdit(){
-    if(this->edits_prob){
+    if(this->mode == PROB_CHANGE_MODE){
       this->probs[this->curr_edit_track][this->curr_edit_step] = ((float)analogRead(VALUE_INPUT) / 1024.) * 100.;
     }
   }
 
   void maybeNoteEdit(){
-    if(!this->edits_prob){
+    if(this->mode == NOTE_CHANGE_MODE){
       this->sequence[this->curr_edit_track][this->curr_edit_step] = (int)(((float)analogRead(VALUE_INPUT) / 1024.) * 88.);
+    }
+  }
+
+  void maybeTempoEdit(){
+    if(this->mode == TEMPO_CHANGE_MODE){
+      this->bpm == (int)(((float)analogRead(VALUE_INPUT) / 1024.) * 500.);
     }
   }
   
@@ -262,8 +328,10 @@ void loop() {
   seq->readButtonPush(800);
   seq->maybePlay();
   seq->maybeChangeMode();
+  seq->maybeSwitchPlays();
   seq->maybeNoteEdit();
   seq->maybeProbEdit();
+  seq->maybeTempoEdit();
   seq->maybeNextBack();
   seq->maybeNextTrack();
 }
