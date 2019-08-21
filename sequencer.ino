@@ -7,7 +7,7 @@
 #define PREVIOUS_INPUT 3
 #define TRACK_CHANGE_INPUT 4
 #define VALUE_INPUT 5
-#define NO_OF_BTNS 4
+#define NO_OF_BTNS 6
 #define NO_MODES 3
 #define NOTE_CHANGE_MODE 0
 #define PROB_CHANGE_MODE 1
@@ -17,13 +17,25 @@ class Step
 {
   private:
     int note = -1;
-    int prob = 100;
+    int prob = MAX_PROB;
     int velo = 127;
   public:
+    void setNote(int note){
+      this->note = min(note, 127);
+    }
+
+    void setProb(int prob){
+      this->prob = min(prob, MAX_PROB);
+    }
+
+    void setVelo(int velo){
+      this->note = min(127, velo);
+    }
+
     int getNotePlayed(){
 
-      if (this->note == -1){
-        return -1;
+      if (this->note == EMPTY_NOTE){
+        return EMPTY_NOTE;
       }
 
       randomSeed(analogRead(0) + micros());
@@ -33,7 +45,7 @@ class Step
         return this->note;
       }
       else{
-        return -1;
+        return EMPTY_NOTE;
       }
     }
 };
@@ -44,19 +56,60 @@ class Track
     bool on = true;
     int channel = 0;
     int no_steps = NO_STEPS;
-    Step* steps[NO_STEPS];
+    Step* steps;
   public:
+    Track(){
+      this->steps = new Step[this->no_steps];
+    }
     void switchTrack(){
       this->on = !this->on;
     }
     void setChannel(int channel){
       this->channel = channel;
     }
+    void setStepNote(int step, int note){
+      this->steps[step].setNote(note);
+    }
+    void setStepProb(int step, int prob){
+      this->steps[step].setProb(prob);
+    }
+    void setStepVelo(int step, int velo){
+      this->steps[step].setProb(velo);
+    }
+};
+
+class Button {
+  private:
+    int pin;
+    bool pushed;
+  public:
+    Button(){
+      this->pin = -1;
+      this->pushed = false;
+    }
+    Button(int pin){
+      pinMode(pin, OUTPUT);
+      this->pin = pin;
+      this->pushed = digitalRead(this->pin) == HIGH;
+    }
+    bool getPushed(){
+      return this->pushed;
+    }
+    void updateStatus(){
+      this->pushed = digitalRead(this->pin) == HIGH;
+    }
+};
+
+class ButtonCombo{
+  private:
+    Button* buttons;
 };
 
 class Sequencer
 {
 private:
+  Track* tracks;
+  Button* buttons;
   int sequence[NO_TRACKS][NO_STEPS] = {{EMPTY_NOTE}};
   int probs[NO_TRACKS][NO_STEPS] = {{50}};
   int velos[NO_TRACKS][NO_STEPS] = {{127}};
@@ -79,6 +132,14 @@ private:
   long beat_time_long;
 public:
   Sequencer(){
+    this->tracks = new Track[NO_TRACKS];
+    this->buttons = new Button[NO_OF_BTNS];
+    this->buttons[0] = new Button(2);
+    this->buttons[1] = new Button(4);
+    this->buttons[2] = new Button(7);
+    this->buttons[3] = new Button(8);
+    this->buttons[4] = new Button(12);
+    this->buttons[5] = new Button(13);
     this->beat_time_long = micros();
     this->last_btn_push_time = micros();
     this->no_steps = NO_STEPS;
