@@ -32,22 +32,42 @@ class Step
       this->note = min(127, velo);
     }
 
-    int getNotePlayed(){
-
+    bool getPlayed(){
       if (this->note == EMPTY_NOTE){
-        return EMPTY_NOTE;
+        return false;
       }
 
       randomSeed(analogRead(0) + micros());
       long randNumber = random(101);
-      Serial.println(randNumber);
       if(randNumber < this->prob){
-        return this->note;
+        return true;
       }
       else{
-        return EMPTY_NOTE;
+        return false;
       }
     }
+
+    int * getNote(){
+      int result[] = {this->note, this->velo};
+      return result;
+    }
+
+    void noteOn(int channel) {
+    if (this->note == EMPTY_NOTE || !this->getPlayed()){
+      return;
+    }
+    Serial.write(144 + channel);
+    Serial.write(this->note);
+    Serial.write(this->velo);
+  }
+  void noteOff(int channel){
+    if (this->note == EMPTY_NOTE){
+      return;
+    }
+    Serial.write(128 + channel);
+    Serial.write(this->note);
+    Serial.write(0);
+  }
 };
 
 class Track
@@ -76,6 +96,20 @@ class Track
     void setStepVelo(int step, int velo){
       this->steps[step].setProb(velo);
     }
+    int * getNoteAtStep(int step){
+      return this->steps[step].getNote();
+    }
+    bool getPlayedAtStep(int step){
+      return this->steps[step].getPlayed();
+    }
+
+    void noteOnAtStep(int step){
+      this->steps[step].noteOn(this->channel);
+    }
+
+    void noteOffAtStep(int step){
+      this->steps[step].noteOff(this->channel);
+    }
 };
 
 class Button {
@@ -92,11 +126,10 @@ class Button {
       this->pin = pin;
       this->pushed = digitalRead(this->pin) == HIGH;
     }
-    bool getPushed(){
-      return this->pushed;
-    }
-    void updateStatus(){
-      this->pushed = digitalRead(this->pin) == HIGH;
+    bool updateStatus(){
+      bool pushed = digitalRead(this->pin) == HIGH;
+      this->pushed = pushed;
+      return pushed;
     }
 };
 
@@ -110,11 +143,6 @@ class Sequencer
 private:
   Track* tracks;
   Button* buttons;
-  int sequence[NO_TRACKS][NO_STEPS] = {{EMPTY_NOTE}};
-  int probs[NO_TRACKS][NO_STEPS] = {{50}};
-  int velos[NO_TRACKS][NO_STEPS] = {{127}};
-  bool track_on[NO_TRACKS] = {true};
-  int tracks_channels[NO_TRACKS] = {0};
   int no_steps;
   int no_tracks;
   int curr_pos;
@@ -122,7 +150,7 @@ private:
   int curr_edit_step;
   bool plays;
   int mode;
-  bool button_pushd;
+  bool action_taken;
   long button_wait;
   int button_waited;
   bool buttons_stats[NO_OF_BTNS] = {false};
@@ -144,80 +172,37 @@ public:
     this->last_btn_push_time = micros();
     this->no_steps = NO_STEPS;
     this->no_tracks = NO_TRACKS;
-    
-    for(int i=0;i<NO_TRACKS;i++){
-      for(int j=0;j<NO_STEPS;j++){
-        this->sequence[i][j] = EMPTY_NOTE;
-      }
-    }
-    for(int i=0;i<NO_TRACKS;i++){
-      for(int j=0;j<NO_STEPS;j++){
-        this->velos[i][j] = 127;
-      }
-    }
+
     this->curr_pos = 0;
     this->curr_edit_track = 0;
     this->curr_edit_step = 0;
     this->plays = false;
     this->mode = false;
-    this->button_pushd = false;
+    this->action_taken = false;
     this->button_wait = 500000;
     this->button_waited = 0;
     }
   void setSequenceAt(int track, int st, int value){
-    this->sequence[track][st] = value;
+    this->tracks[track].setStepNote(st, value);
   }
   void setProbAt(int track, int st, int value){
-    this->probs[track][st] = value % (MAX_PROB + 1);
-  }
-  void setTrackOnOffAt(int track, bool value){
-    this->track_on[track] = value;
-  }
-
-  bool getNotePlayedAt(int track, int st){
-    if (this->sequence[track][st] == -1){
-      return false;
-    }
-    randomSeed(analogRead(0));
-    long randNumber = random(101);
-    Serial.println(randNumber);
-    Serial.println(this->sequence[track][st]);
-    Serial.println(track);
-    Serial.println(st);
-    if(track_on[track] && randNumber < this->probs[track][st]){
-      return true;
-    }
-    else{
-      return false;
-    }
-  }
-  void noteOn(int channel, int pitch, int velocity) {
-    Serial.write(144 + channel);
-    Serial.write(pitch);
-    Serial.write(velocity);
-  }
-  void noteOff(int channel, int pitch, int velocity){
-    Serial.write(128 + channel);
-    Serial.write(pitch);
-    Serial.write(velocity);
+    this->tracks[track].setStepNote(st, value % (MAX_PROB + 1));
   }
 
   void scheduleNotesOn(){
     for(int i=0;i<this->no_tracks;i++){
-      if (this->getNotePlayedAt(i, this->curr_pos)){
-        this->noteOn(this->tracks_channels[i], this->sequence[i][this->curr_pos], this->velos[i][this->curr_pos]);
-      }
+      this->tracks[i].noteOnAtStep(this->curr_pos);
     }
   }
 
   void scheduleNotesOff(){
     for(int i=0;i<this->no_tracks;i++){
-      this->noteOff(this->tracks_channels[i], this->sequence[i][this->curr_pos], this->velos[i][this->curr_pos]);
+      this->tracks[i].noteOffAtStep(this->curr_pos);
     }
   }
 
   void nextStep(){
-    Serial.println("bang");
+    this->scheduleNotesOff();
     this->curr_pos = (this->curr_pos + 1) % this->no_steps;
     this->scheduleNotesOn();
     this->beat_time_long = micros();
@@ -234,15 +219,16 @@ public:
     this->plays = !(this->plays);
     if (this->plays){
       this->scheduleNotesOn();
+      this->beat_time_long = micros();
     }
-    this->beat_time_long = micros();
-    Serial.println(this->beat_time_long - micros());
+    else{
+      this->scheduleNotesOff();
+    }
   }
   
   void maybePlay(){
     if(this->plays){
       if(micros() - this->beat_time_long >= 60000000. / (float)this->bpm){
-        this->scheduleNotesOff();
         this->nextStep();
       }
       }
@@ -285,41 +271,34 @@ public:
     return this->button_waited == this->button_wait;
   }
 
-  void readButtonPush(int sens){
-    bool any_pushd = false;
-    for(int i=0;i<NO_OF_BTNS;i++){
-      if(analogRead(i+1) > sens){
-        if(!this->waitedTooLong()){
-          this->buttons_stats[i] = true;
-        }
-        any_pushd = true;
+  bool updateAnyPushed(){
+    for (int i = 0; i < NO_OF_BTNS; i++)
+    {
+      if(this->buttons[i].updateStatus()){
+        this->any_pushd = true;
       }
     }
-    if(!this->any_pushd && any_pushd){
-      this->last_btn_push_time = micros();
-    }
-    this->button_pushd = this->button_pushd && any_pushd;
-    this->any_pushd = any_pushd;
+    this->any_pushd = false;
+    this->action_taken = false;
   }
 
   bool btnComboReady(int btns[], int count){
-    bool btns_ready = true;
     bool btns_together[NO_OF_BTNS] = {false};
-    if(this->button_pushd){
+    if(this->action_taken){
       return false;
     }
     if(!this->waitedTooLong()){
       return false;
     }
     for(int i=0;i<count;i++){
-      btns_together[btns[i]-1] = true;
+      btns_together[btns[i]] = true;
     }
     for(int i=0;i<NO_OF_BTNS;i++){
-      if(btns_together[i] != this->buttons_stats[i]){
+      if(btns_together[i] != this->buttons[i].updateStatus()){
         return false;
       }
     }
-    this->button_pushd = true;
+    this->action_taken = true;
     return true;
   }
   
