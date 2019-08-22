@@ -104,12 +104,18 @@ class Track
     }
 
     void noteOnAtStep(int step){
+      if (this->on){
       this->steps[step].noteOn(this->channel);
+      }
     }
 
     void noteOffAtStep(int step){
+      if (this->on){
       this->steps[step].noteOff(this->channel);
+      }
     }
+
+    
 };
 
 class Button {
@@ -142,7 +148,7 @@ class Sequencer
 {
 private:
   Track* tracks;
-  Button* buttons;
+  Button** buttons;
   int no_steps;
   int no_tracks;
   int curr_pos;
@@ -161,7 +167,7 @@ private:
 public:
   Sequencer(){
     this->tracks = new Track[NO_TRACKS];
-    this->buttons = new Button[NO_OF_BTNS];
+    this->buttons = new Button*[NO_OF_BTNS];
     this->buttons[0] = new Button(2);
     this->buttons[1] = new Button(4);
     this->buttons[2] = new Button(7);
@@ -244,7 +250,7 @@ public:
   }
 
   void switchEditTrack(){
-    this->track_on[this->curr_edit_track] = !this->track_on;
+    this->tracks[this->curr_edit_track].switchTrack();
   }
 
   int editStepNext(){
@@ -274,7 +280,7 @@ public:
   bool updateAnyPushed(){
     for (int i = 0; i < NO_OF_BTNS; i++)
     {
-      if(this->buttons[i].updateStatus()){
+      if(this->buttons[i]->updateStatus()){
         this->any_pushd = true;
       }
     }
@@ -294,7 +300,7 @@ public:
       btns_together[btns[i]] = true;
     }
     for(int i=0;i<NO_OF_BTNS;i++){
-      if(btns_together[i] != this->buttons[i].updateStatus()){
+      if(btns_together[i] != this->buttons[i]->updateStatus()){
         return false;
       }
     }
@@ -336,13 +342,13 @@ public:
 
   void maybeProbEdit(){
     if(this->mode == PROB_CHANGE_MODE){
-      this->probs[this->curr_edit_track][this->curr_edit_step] = ((float)analogRead(VALUE_INPUT) / 1024.) * 100.;
-    }
+      this->tracks[this->curr_edit_track].setStepProb(this->curr_edit_step, (int)(((float)analogRead(VALUE_INPUT) / 1024.) * 100.));
+      }
   }
 
   void maybeNoteEdit(){
     if(this->mode == NOTE_CHANGE_MODE){
-      this->sequence[this->curr_edit_track][this->curr_edit_step] = (int)(((float)analogRead(VALUE_INPUT) / 1024.) * 88.);
+      this->tracks[this->curr_edit_track].setStepNote(this->curr_edit_step, (int)(((float)analogRead(VALUE_INPUT) / 1024.) * 127.));
     }
   }
 
@@ -365,7 +371,7 @@ void setup() {
 }
 
 void loop() {
-  seq->readButtonPush(800);
+  seq->updateAnyPushed();
   seq->maybePlay();
   seq->maybeChangeMode();
   seq->maybeSwitchPlays();
