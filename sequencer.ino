@@ -56,6 +56,8 @@ class Step
     if (this->note == EMPTY_NOTE || !this->getPlayed()){
       return;
     }
+    Serial.println("wtf");
+    Serial.println(this->note);
     Serial.write(144 + channel);
     Serial.write(this->note);
     Serial.write(this->velo);
@@ -158,7 +160,7 @@ private:
   int mode;
   bool action_taken;
   long button_wait;
-  int button_waited;
+  long button_waited;
   bool buttons_stats[NO_OF_BTNS] = {false};
   bool any_pushd = false;
   long last_btn_push_time;
@@ -185,7 +187,7 @@ public:
     this->plays = false;
     this->mode = false;
     this->action_taken = false;
-    this->button_wait = 500000;
+    this->button_wait = 125000;
     this->button_waited = 0;
     }
   void setSequenceAt(int track, int st, int value){
@@ -208,6 +210,7 @@ public:
   }
 
   void nextStep(){
+    Serial.println("beng");
     this->scheduleNotesOff();
     this->curr_pos = (this->curr_pos + 1) % this->no_steps;
     this->scheduleNotesOn();
@@ -266,6 +269,7 @@ public:
   void updateBtnWaitedTime(){
     if(this->any_pushd){
       this->button_waited = min(micros() - this->last_btn_push_time, this->button_wait);
+      Serial.println(this->button_waited);
     }
     else{
       this->button_waited = 0;
@@ -281,11 +285,17 @@ public:
     for (int i = 0; i < NO_OF_BTNS; i++)
     {
       if(this->buttons[i]->updateStatus()){
+        if(this->any_pushd){
+          return true;
+        }
         this->any_pushd = true;
+        this->last_btn_push_time = micros();
+        return true;
       }
     }
     this->any_pushd = false;
     this->action_taken = false;
+    return false;
   }
 
   bool btnComboReady(int btns[], int count){
@@ -311,12 +321,14 @@ public:
   void maybeNextTrack(){
     int next[1] = {TRACK_CHANGE_INPUT};
     if(this->btnComboReady(next, 1)){
+      Serial.println(this->btnComboReady(next, 1));
       this->editTrackNext();
     }
   }
   void maybeSwitchPlays(){
     int switch_plays[2] = {NEXT_INPUT, PREVIOUS_INPUT};
     if(this->btnComboReady(switch_plays, 2)){
+      Serial.println("plays");
       this->switchPlays();
     }
   }
