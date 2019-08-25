@@ -116,8 +116,6 @@ class Track
       this->steps[step].noteOff(this->channel);
       }
     }
-
-    
 };
 
 class Button {
@@ -141,9 +139,33 @@ class Button {
     }
 };
 
-class ButtonCombo{
+class PotInput{
   private:
-    Button* buttons;
+    int pin;
+    int last_value;
+    long cooldown;
+    int error_range;
+  public:
+  PotInput(){
+    this->pin = -1;
+    this->last_value = 0;
+    this->error_range = 10;
+  }
+
+  PotInput(int pin){
+    this->pin = pin;
+    this->last_value = analogRead(this->pin);
+    this->error_range = 10;
+  }
+
+  void updateLastValue(){
+    this->last_value = analogRead(this->pin);
+  }
+
+  int readValue(){
+    return analogRead(this->pin);
+  }
+
 };
 
 class Sequencer
