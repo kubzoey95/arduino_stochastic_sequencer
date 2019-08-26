@@ -144,28 +144,42 @@ class PotInput{
     int pin;
     int last_value;
     long cooldown;
-    int error_range;
+    int scale;
+    long last_value_time;
   public:
   PotInput(){
     this->pin = -1;
     this->last_value = 0;
-    this->error_range = 10;
+    this->last_value_time = micros();
+    this->scale = 127;
   }
 
-  PotInput(int pin){
+  PotInput(int pin, int scale){
     this->pin = pin;
     this->last_value = analogRead(this->pin);
-    this->error_range = 10;
+    this->last_value_time = micros();
+    this->scale = scale;
+  }
+
+  float scaleToPropError(){
+    return 1. / (float)this->scale;
   }
 
   void updateLastValue(){
-    this->last_value = analogRead(this->pin);
+    if(abs(this->last_value - analogRead(this->pin)) > this->scaleToPropError()){
+      this->last_value = analogRead(this->pin);
+      this->last_value_time = micros();
+    }
   }
 
   int readValue(){
-    return analogRead(this->pin);
+    return this->last_value;
   }
 
+  bool newValue(){
+    this->updateLastValue();
+    return this->last_value == (micros() - this->last_value_time) < this->cooldown;
+  }
 };
 
 class Sequencer
@@ -173,6 +187,7 @@ class Sequencer
 private:
   Track* tracks;
   Button** buttons;
+  PotInput** pots;
   int no_steps;
   int no_tracks;
   int curr_pos;
@@ -192,12 +207,14 @@ public:
   Sequencer(){
     this->tracks = new Track[NO_TRACKS];
     this->buttons = new Button*[NO_OF_BTNS];
+    this->pots = new PotInput*[1];
     this->buttons[0] = new Button(2);
     this->buttons[1] = new Button(4);
     this->buttons[2] = new Button(7);
     this->buttons[3] = new Button(8);
     this->buttons[4] = new Button(12);
     this->buttons[5] = new Button(13);
+    this->pots[0] = new PotInput(VALUE_INPUT, 127);
     this->beat_time_long = micros();
     this->last_btn_push_time = micros();
     this->no_steps = NO_STEPS;
@@ -376,22 +393,27 @@ public:
 
   void maybeProbEdit(){
     if(this->mode == PROB_CHANGE_MODE){
-      this->tracks[this->curr_edit_track].setStepProb(this->curr_edit_step, (int)(((float)analogRead(VALUE_INPUT) / 1024.) * 100.));
+        if(this->pots[0]->newValue()){
+          this->tracks[this->curr_edit_track].setStepProb(this->curr_edit_step, (int)(((float)this->pots[0]->readValue() / 1024.) * 127.));
+        }
       }
   }
 
   void maybeNoteEdit(){
     if(this->mode == NOTE_CHANGE_MODE){
-      this->tracks[this->curr_edit_track].setStepNote(this->curr_edit_step, (int)(((float)analogRead(VALUE_INPUT) / 1024.) * 127.));
+      if(this->pots[0]->newValue()){
+        this->tracks[this->curr_edit_track].setStepNote(this->curr_edit_step, (int)(((float)this->pots[0]->readValue() / 1024.) * 127.));
     }
+  }
   }
 
   void maybeTempoEdit(){
     if(this->mode == TEMPO_CHANGE_MODE){
-      this->bpm == (int)(((float)analogRead(VALUE_INPUT) / 1024.) * 500.);
+      if(this->pots[0]->newValue()){
+        this->bpm == (int)(((float)this->pots[0]->readValue() / 1024.) * 500.);
+      }
     }
   }
-  
 };
 
 Sequencer *seq;
