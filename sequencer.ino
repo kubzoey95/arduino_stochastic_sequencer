@@ -146,9 +146,7 @@ class PotInput{
   private:
     int pin;
     int last_value;
-    long cooldown;
     int scale;
-    long last_value_time;
   public:
   PotInput(){
     this->pin = -1;
@@ -159,7 +157,6 @@ class PotInput{
   PotInput(int pin, int scale){
     this->pin = pin;
     this->last_value = analogRead(this->pin);
-    this->last_value_time = micros() - this->cooldown - 1;
     this->scale = scale;
   }
 
@@ -173,7 +170,7 @@ class PotInput{
 
   bool newValue(){
     int read = analogRead(this->pin);
-    if (abs(this->last_value - read) > this->scaleToPropError()){
+    if (abs(this->last_value - read) / 1024. > this->scaleToPropError()){
       this->last_value = read;
       return true;
     }
