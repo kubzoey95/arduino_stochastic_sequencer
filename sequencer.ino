@@ -6,7 +6,10 @@
 #define NEXT_INPUT 2
 #define PREVIOUS_INPUT 3
 #define TRACK_CHANGE_INPUT 4
-#define VALUE_INPUT 5
+#define NOTE_INPUT 5
+#define VELO_INPUT 4
+#define TEMPO_INPUT 3
+#define PROB_INPUT 2
 #define NO_OF_BTNS 6
 #define NO_MODES 3
 #define NOTE_CHANGE_MODE 0
@@ -150,14 +153,14 @@ class PotInput{
   PotInput(){
     this->pin = -1;
     this->last_value = 0;
-    this->last_value_time = micros();
+    this->last_value_time = micros() - this->cooldown - 1;
     this->scale = 127;
   }
 
   PotInput(int pin, int scale){
     this->pin = pin;
     this->last_value = analogRead(this->pin);
-    this->last_value_time = micros();
+    this->last_value_time = micros() - this->cooldown - 1;
     this->scale = scale;
   }
 
@@ -214,7 +217,10 @@ public:
     this->buttons[3] = new Button(8);
     this->buttons[4] = new Button(12);
     this->buttons[5] = new Button(13);
-    this->pots[0] = new PotInput(VALUE_INPUT, 127);
+    this->pots[0] = new PotInput(NOTE_INPUT, 127);
+    this->pots[1] = new PotInput(VELO_INPUT, 127);
+    this->pots[2] = new PotInput(PROB_INPUT, 100);
+    this->pots[3] = new PotInput(TEMPO_INPUT, 500);
     this->beat_time_long = micros();
     this->last_btn_push_time = micros();
     this->no_steps = NO_STEPS;
@@ -393,24 +399,36 @@ public:
 
   void maybeProbEdit(){
     if(this->mode == PROB_CHANGE_MODE){
-        if(this->pots[0]->newValue()){
-          this->tracks[this->curr_edit_track].setStepProb(this->curr_edit_step, (int)(((float)this->pots[0]->readValue() / 1024.) * 127.));
+      int pot_no = 2;
+        if(this->pots[pot_no]->newValue()){
+          this->tracks[this->curr_edit_track].setStepProb(this->curr_edit_step, (int)(((float)this->pots[pot_no]->readValue() / 1024.) * 100.));
         }
       }
   }
 
   void maybeNoteEdit(){
     if(this->mode == NOTE_CHANGE_MODE){
-      if(this->pots[0]->newValue()){
-        this->tracks[this->curr_edit_track].setStepNote(this->curr_edit_step, (int)(((float)this->pots[0]->readValue() / 1024.) * 127.));
+      int pot_no = 0;
+      if(this->pots[pot_no]->newValue()){
+        this->tracks[this->curr_edit_track].setStepNote(this->curr_edit_step, (int)(((float)this->pots[pot_no]->readValue() / 1024.) * 127.));
+    }
+  }
+  }
+
+  void maybeVeloEdit(){
+    if(this->mode == NOTE_CHANGE_MODE){
+      int pot_no = 1;
+      if(this->pots[pot_no]->newValue()){
+        this->tracks[this->curr_edit_track].setStepVelo(this->curr_edit_step, (int)(((float)this->pots[pot_no]->readValue() / 1024.) * 127.));
     }
   }
   }
 
   void maybeTempoEdit(){
     if(this->mode == TEMPO_CHANGE_MODE){
-      if(this->pots[0]->newValue()){
-        this->bpm == (int)(((float)this->pots[0]->readValue() / 1024.) * 500.);
+      int pot_no = 3;
+      if(this->pots[pot_no]->newValue()){
+        this->bpm == (int)(((float)this->pots[pot_no]->readValue() / 1024.) * 500.);
       }
     }
   }
@@ -434,6 +452,7 @@ void loop() {
   seq->maybeNoteEdit();
   seq->maybeProbEdit();
   seq->maybeTempoEdit();
+  seq->maybeVeloEdit();
   seq->maybeNextBack();
   seq->maybeNextTrack();
 }
