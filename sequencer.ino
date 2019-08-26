@@ -153,7 +153,6 @@ class PotInput{
   PotInput(){
     this->pin = -1;
     this->last_value = 0;
-    this->last_value_time = micros() - this->cooldown - 1;
     this->scale = 127;
   }
 
@@ -168,20 +167,17 @@ class PotInput{
     return 1. / (float)this->scale;
   }
 
-  void updateLastValue(){
-    if(abs(this->last_value - analogRead(this->pin)) > this->scaleToPropError()){
-      this->last_value = analogRead(this->pin);
-      this->last_value_time = micros();
-    }
-  }
-
   int readValue(){
     return this->last_value;
   }
 
   bool newValue(){
-    this->updateLastValue();
-    return this->last_value == (micros() - this->last_value_time) < this->cooldown;
+    int read = analogRead(this->pin);
+    if (abs(this->last_value - read) > this->scaleToPropError()){
+      this->last_value = read;
+      return true;
+    }
+    return false;
   }
 };
 
