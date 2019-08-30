@@ -59,8 +59,6 @@ class Step
     if (this->note == EMPTY_NOTE || !this->getPlayed()){
       return;
     }
-    Serial.println("wtf");
-    Serial.println(this->note);
     Serial.write(144 + channel);
     Serial.write(this->note);
     Serial.write(this->velo);
@@ -145,8 +143,8 @@ class Button {
 class PotInput{
   private:
     int pin;
-    int last_value;
-    int scale;
+    float last_value;
+    float scale;
   public:
   PotInput(){
     this->pin = -1;
@@ -154,24 +152,22 @@ class PotInput{
     this->scale = 127;
   }
 
-  PotInput(int pin, int scale){
+  PotInput(int pin, float scale){
     this->pin = pin;
-    this->last_value = analogRead(this->pin);
+    this->last_value = min(analogRead(this->pin), 1024.);
     this->scale = scale;
   }
 
-  float scaleToPropError(){
-    return 1. / (float)this->scale;
-  }
-
-  int readValue(){
+  float readValue(){
     return this->last_value;
   }
 
   bool newValue(){
-    int read = analogRead(this->pin);
-    if (abs(this->last_value - read) / 1024. > this->scaleToPropError()){
-      this->last_value = read;
+    float reading = analogRead(this->pin);
+    reading = 0.9 * this->last_value + 0.1 * reading;
+    float dif = this->last_value - reading;
+    if(abs(dif) / 1024.00000 > this->scale){
+      this->last_value = reading;
       return true;
     }
     return false;
@@ -203,17 +199,17 @@ public:
   Sequencer(){
     this->tracks = new Track[NO_TRACKS];
     this->buttons = new Button*[NO_OF_BTNS];
-    this->pots = new PotInput*[1];
+    this->pots = new PotInput*[4];
     this->buttons[0] = new Button(2);
     this->buttons[1] = new Button(4);
     this->buttons[2] = new Button(7);
     this->buttons[3] = new Button(8);
     this->buttons[4] = new Button(12);
     this->buttons[5] = new Button(13);
-    this->pots[0] = new PotInput(NOTE_INPUT, 127);
-    this->pots[1] = new PotInput(VELO_INPUT, 127);
-    this->pots[2] = new PotInput(PROB_INPUT, 100);
-    this->pots[3] = new PotInput(TEMPO_INPUT, 500);
+    this->pots[0] = new PotInput(NOTE_INPUT, 1. / 127.);
+    this->pots[1] = new PotInput(VELO_INPUT, 1. / 127.);
+    this->pots[2] = new PotInput(PROB_INPUT, 1. / 100.);
+    this->pots[3] = new PotInput(TEMPO_INPUT, 1. / 100.);
     this->beat_time_long = micros();
     this->last_btn_push_time = micros();
     this->no_steps = NO_STEPS;
@@ -249,6 +245,7 @@ public:
 
   void nextStep(){
     Serial.println("beng");
+    Serial.println(this->bpm);
     this->scheduleNotesOff();
     this->curr_pos = (this->curr_pos + 1) % this->no_steps;
     this->scheduleNotesOn();
@@ -418,12 +415,11 @@ public:
   }
 
   void maybeTempoEdit(){
-    if(this->mode == TEMPO_CHANGE_MODE){
       int pot_no = 3;
       if(this->pots[pot_no]->newValue()){
-        this->bpm == (int)(((float)this->pots[pot_no]->readValue() / 1024.) * 500.);
+        //Serial.println(this->bpm);
+        this->bpm = this->pots[pot_no]->readValue() / 1024. * 500.;
       }
-    }
   }
 };
 
@@ -442,10 +438,10 @@ void loop() {
   seq->maybePlay();
   seq->maybeChangeMode();
   seq->maybeSwitchPlays();
-  seq->maybeNoteEdit();
-  seq->maybeProbEdit();
+//  seq->maybeNoteEdit();
+//  seq->maybeProbEdit();
   seq->maybeTempoEdit();
-  seq->maybeVeloEdit();
+//  seq->maybeVeloEdit();
   seq->maybeNextBack();
   seq->maybeNextTrack();
 }
