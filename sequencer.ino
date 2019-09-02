@@ -2,15 +2,15 @@
 #define NO_STEPS 16
 #define MAX_PROB 100
 #define EMPTY_NOTE -1
-#define MODE_INPUT 1
-#define NEXT_INPUT 2
-#define PREVIOUS_INPUT 3
-#define TRACK_CHANGE_INPUT 4
+#define MODE_INPUT 0
+#define NEXT_INPUT 1
+#define PREVIOUS_INPUT 2
+#define TRACK_CHANGE_INPUT 3
 #define NOTE_INPUT 5
 #define VELO_INPUT 4
 #define TEMPO_INPUT 3
 #define PROB_INPUT 2
-#define NO_OF_BTNS 6
+#define NO_OF_BTNS 4
 #define NO_MODES 3
 #define NOTE_CHANGE_MODE 0
 #define PROB_CHANGE_MODE 1
@@ -200,12 +200,10 @@ public:
     this->tracks = new Track[NO_TRACKS];
     this->buttons = new Button*[NO_OF_BTNS];
     this->pots = new PotInput*[4];
-    this->buttons[0] = new Button(2);
-    this->buttons[1] = new Button(4);
-    this->buttons[2] = new Button(7);
-    this->buttons[3] = new Button(8);
-    this->buttons[4] = new Button(12);
-    this->buttons[5] = new Button(13);
+    this->buttons[0] = new Button(4);
+    this->buttons[1] = new Button(7);
+    this->buttons[2] = new Button(8);
+    this->buttons[3] = new Button(12);
     this->pots[0] = new PotInput(NOTE_INPUT, 1. / 127.);
     this->pots[1] = new PotInput(VELO_INPUT, 1. / 127.);
     this->pots[2] = new PotInput(PROB_INPUT, 1. / 100.);
@@ -244,8 +242,6 @@ public:
   }
 
   void nextStep(){
-    Serial.println("beng");
-    Serial.println(this->bpm);
     this->scheduleNotesOff();
     this->curr_pos = (this->curr_pos + 1) % this->no_steps;
     this->scheduleNotesOn();
@@ -293,18 +289,19 @@ public:
 
   int editStepNext(){
     this->curr_edit_step = (this->curr_edit_step + 1) % this->no_steps;
+    Serial.println(this->curr_edit_step);
     return this->curr_edit_step;
   }
 
   int editStepPrevious(){
     this->curr_edit_step = (this->curr_edit_step - 1) % this->no_steps;
+    Serial.println(this->curr_edit_step);
     return this->curr_edit_step;
   }
 
   void updateBtnWaitedTime(){
     if(this->any_pushd){
       this->button_waited = min(micros() - this->last_btn_push_time, this->button_wait);
-      Serial.println(this->button_waited);
     }
     else{
       this->button_waited = 0;
@@ -354,16 +351,14 @@ public:
   }
   
   void maybeNextTrack(){
-    int next[1] = {TRACK_CHANGE_INPUT};
-    if(this->btnComboReady(next, 1)){
-      Serial.println(this->btnComboReady(next, 1));
+    int next[2] = {TRACK_CHANGE_INPUT, MODE_INPUT};
+    if(this->btnComboReady(next, 2)){
       this->editTrackNext();
     }
   }
   void maybeSwitchPlays(){
     int switch_plays[2] = {NEXT_INPUT, PREVIOUS_INPUT};
     if(this->btnComboReady(switch_plays, 2)){
-      Serial.println("plays");
       this->switchPlays();
     }
   }
@@ -380,44 +375,36 @@ public:
     }
   }
   void maybeChangeMode(){
-    int mode[] = {MODE_INPUT};
-    if(this->btnComboReady(mode, 1)){
-      Serial.println("mode changed");
-      this->switchMode();
-    }
+    // int mode[] = {MODE_INPUT};
+    // if(this->btnComboReady(mode, 1)){
+    //   this->switchMode();
+    // }
   }
 
   void maybeProbEdit(){
-    if(this->mode == PROB_CHANGE_MODE){
-      int pot_no = 2;
-        if(this->pots[pot_no]->newValue()){
-          this->tracks[this->curr_edit_track].setStepProb(this->curr_edit_step, (int)(((float)this->pots[pot_no]->readValue() / 1024.) * 100.));
-        }
-      }
+//      int pot_no = 2;
+//        if(this->pots[pot_no]->newValue()){
+//          this->tracks[this->curr_edit_track].setStepProb(this->curr_edit_step, (int)(((float)this->pots[pot_no]->readValue() / 1024.) * 100.));
+//        }
   }
 
   void maybeNoteEdit(){
-    if(this->mode == NOTE_CHANGE_MODE){
       int pot_no = 0;
       if(this->pots[pot_no]->newValue()){
         this->tracks[this->curr_edit_track].setStepNote(this->curr_edit_step, (int)(((float)this->pots[pot_no]->readValue() / 1024.) * 127.));
     }
   }
-  }
 
   void maybeVeloEdit(){
-    if(this->mode == NOTE_CHANGE_MODE){
       int pot_no = 1;
       if(this->pots[pot_no]->newValue()){
         this->tracks[this->curr_edit_track].setStepVelo(this->curr_edit_step, (int)(((float)this->pots[pot_no]->readValue() / 1024.) * 127.));
     }
   }
-  }
 
   void maybeTempoEdit(){
       int pot_no = 3;
       if(this->pots[pot_no]->newValue()){
-        //Serial.println(this->bpm);
         this->bpm = this->pots[pot_no]->readValue() / 1024. * 500.;
       }
   }
@@ -428,7 +415,6 @@ Sequencer *seq;
 
 void setup() {
   Serial.begin(9600);
-  Serial.println("begin");
   seq = new Sequencer();
   seq->switchPlays();
 }
@@ -438,10 +424,10 @@ void loop() {
   seq->maybePlay();
   seq->maybeChangeMode();
   seq->maybeSwitchPlays();
-//  seq->maybeNoteEdit();
-//  seq->maybeProbEdit();
+  seq->maybeNoteEdit();
+  seq->maybeProbEdit();
   seq->maybeTempoEdit();
-//  seq->maybeVeloEdit();
+  seq->maybeVeloEdit();
   seq->maybeNextBack();
   seq->maybeNextTrack();
 }
