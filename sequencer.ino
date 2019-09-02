@@ -62,6 +62,12 @@ class Step
     Serial.write(144 + channel);
     Serial.write(this->note);
     Serial.write(this->velo);
+//    Serial.println("channel");
+//    Serial.println(channel);
+//    Serial.println("note");
+//    Serial.println(this->note);
+//    Serial.println("velo");
+//    Serial.println(this->velo);
   }
   void noteOff(int channel){
     if (this->note == EMPTY_NOTE){
@@ -70,6 +76,9 @@ class Step
     Serial.write(128 + channel);
     Serial.write(this->note);
     Serial.write(0);
+//    Serial.println(channel);
+//    Serial.println(this->note);
+//    Serial.println(this->velo);
   }
 };
 
@@ -226,11 +235,13 @@ public:
     this->tracks[track].setStepNote(st, value);
   }
   void setProbAt(int track, int st, int value){
-    this->tracks[track].setStepNote(st, value % (MAX_PROB + 1));
+    this->tracks[track].setStepNote(st, min(value, MAX_PROB + 1));
   }
 
   void scheduleNotesOn(){
     for(int i=0;i<this->no_tracks;i++){
+//      Serial.println("step:");
+//      Serial.println(this->curr_pos);
       this->tracks[i].noteOnAtStep(this->curr_pos);
     }
   }
@@ -243,7 +254,7 @@ public:
 
   void nextStep(){
     this->scheduleNotesOff();
-    this->curr_pos = (this->curr_pos + 1) % this->no_steps;
+    this->curr_pos = ((this->curr_pos + 1) % this->no_steps + this->no_steps) % this->no_steps;
     this->scheduleNotesOn();
     this->beat_time_long = micros();
   }
@@ -279,7 +290,7 @@ public:
   }
 
   int editTrackNext(){
-    this->curr_edit_track = (this->curr_edit_track + 1) % this->no_tracks;
+    this->curr_edit_track = ((this->curr_edit_track + 1) % this->no_tracks + this->no_tracks) % this->no_tracks;
     return this->curr_edit_track;
   }
 
@@ -288,14 +299,14 @@ public:
   }
 
   int editStepNext(){
-    this->curr_edit_step = (this->curr_edit_step + 1) % this->no_steps;
-    Serial.println(this->curr_edit_step);
+    this->curr_edit_step = ((this->curr_edit_step + 1) % this->no_steps + this->no_steps) % this->no_steps;
+//    Serial.println(this->curr_edit_step);
     return this->curr_edit_step;
   }
 
   int editStepPrevious(){
-    this->curr_edit_step = (this->curr_edit_step - 1) % this->no_steps;
-    Serial.println(this->curr_edit_step);
+    this->curr_edit_step = ((this->curr_edit_step - 1) % this->no_steps + this->no_steps) % this->no_steps;
+//    Serial.println(this->curr_edit_step);
     return this->curr_edit_step;
   }
 
@@ -414,7 +425,7 @@ Sequencer *seq;
 
 
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(31250);
   seq = new Sequencer();
   seq->switchPlays();
 }
