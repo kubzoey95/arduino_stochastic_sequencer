@@ -8,8 +8,8 @@
 #define TRACK_CHANGE_INPUT 3
 #define NOTE_INPUT 5
 #define VELO_INPUT 4
-#define TEMPO_INPUT 3
-#define PROB_INPUT 2
+#define TEMPO_INPUT 2
+#define PROB_INPUT 3
 #define NO_OF_BTNS 4
 #define NO_MODES 3
 #define NOTE_CHANGE_MODE 0
@@ -62,23 +62,14 @@ class Step
     Serial.write(144 + channel);
     Serial.write(this->note);
     Serial.write(this->velo);
-//    Serial.println("channel");
-//    Serial.println(channel);
-//    Serial.println("note");
-//    Serial.println(this->note);
-//    Serial.println("velo");
-//    Serial.println(this->velo);
   }
   void noteOff(int channel){
     if (this->note == EMPTY_NOTE){
       return;
     }
-    Serial.write(128 + channel);
+    Serial.write(144 + channel);
     Serial.write(this->note);
     Serial.write(0);
-//    Serial.println(channel);
-//    Serial.println(this->note);
-//    Serial.println(this->velo);
   }
 };
 
@@ -98,6 +89,10 @@ class Track
     }
     void setChannel(int channel){
       this->channel = channel;
+    }
+
+    int getChannel(){
+      return this->channel;
     }
     void setStepNote(int step, int note){
       this->steps[step].setNote(note);
@@ -240,15 +235,16 @@ public:
 
   void scheduleNotesOn(){
     for(int i=0;i<this->no_tracks;i++){
-//      Serial.println("step:");
-//      Serial.println(this->curr_pos);
       this->tracks[i].noteOnAtStep(this->curr_pos);
     }
   }
 
   void scheduleNotesOff(){
     for(int i=0;i<this->no_tracks;i++){
-      this->tracks[i].noteOffAtStep(this->curr_pos);
+      Serial.write(176 + this->tracks[i].getChannel());
+      Serial.write(123);
+      Serial.write(0);
+//      this->tracks[i].noteOffAtStep(this->curr_pos);
     }
   }
 
@@ -300,13 +296,11 @@ public:
 
   int editStepNext(){
     this->curr_edit_step = ((this->curr_edit_step + 1) % this->no_steps + this->no_steps) % this->no_steps;
-//    Serial.println(this->curr_edit_step);
     return this->curr_edit_step;
   }
 
   int editStepPrevious(){
     this->curr_edit_step = ((this->curr_edit_step - 1) % this->no_steps + this->no_steps) % this->no_steps;
-//    Serial.println(this->curr_edit_step);
     return this->curr_edit_step;
   }
 
@@ -393,10 +387,10 @@ public:
   }
 
   void maybeProbEdit(){
-//      int pot_no = 2;
-//        if(this->pots[pot_no]->newValue()){
-//          this->tracks[this->curr_edit_track].setStepProb(this->curr_edit_step, (int)(((float)this->pots[pot_no]->readValue() / 1024.) * 100.));
-//        }
+      int pot_no = 2;
+        if(this->pots[pot_no]->newValue()){
+          this->tracks[this->curr_edit_track].setStepProb(this->curr_edit_step, (int)(((float)this->pots[pot_no]->readValue() / 1024.) * 100.));
+        }
   }
 
   void maybeNoteEdit(){
