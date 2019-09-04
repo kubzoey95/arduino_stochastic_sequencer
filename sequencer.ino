@@ -59,6 +59,11 @@ class Step
     if (this->note == EMPTY_NOTE || !this->getPlayed()){
       return;
     }
+//    Serial.println(channel);
+//    Serial.println(this->note);
+//    Serial.println(this->velo);
+//    Serial.println(this->prob);
+    
     Serial.write(144 + channel);
     Serial.write(this->note);
     Serial.write(this->velo);
@@ -379,11 +384,34 @@ public:
       return;
     }
   }
-  void maybeChangeMode(){
-    // int mode[] = {MODE_INPUT};
-    // if(this->btnComboReady(mode, 1)){
-    //   this->switchMode();
-    // }
+  void maybeEraseAllFromTrack(){
+    int erease[] = {MODE_INPUT, NEXT_INPUT};
+    if(this->btnComboReady(erease, 2)){
+      for (int i = 0; i < this->no_steps; i++)
+      {
+        this->tracks[this->curr_edit_track].setStepProb(i, 100);
+       this->tracks[this->curr_edit_track].setStepNote(i, -1);
+       this->tracks[this->curr_edit_track].setStepVelo(i, 0);
+      }
+    }
+  }
+
+  void maybeRandomTrack(){
+    int rand[] = {PREVIOUS_INPUT, TRACK_CHANGE_INPUT};
+    if(this->btnComboReady(rand, 2)){
+      for (int i = 0; i < this->no_steps; i++)
+      {
+       randomSeed(analogRead(0) + micros());
+       long prob = random(101);
+       randomSeed(analogRead(0) + micros());
+       long note = random(128);
+       randomSeed(analogRead(0) + micros());
+       long velo = 127;
+       this->tracks[this->curr_edit_track].setStepProb(i, prob);
+       this->tracks[this->curr_edit_track].setStepNote(i, note);
+       this->tracks[this->curr_edit_track].setStepVelo(i, velo);
+      }
+    }
   }
 
   void maybeProbEdit(){
@@ -427,7 +455,6 @@ void setup() {
 void loop() {
   seq->updateAnyPushed();
   seq->maybePlay();
-  seq->maybeChangeMode();
   seq->maybeSwitchPlays();
   seq->maybeNoteEdit();
   seq->maybeProbEdit();
@@ -435,4 +462,6 @@ void loop() {
   seq->maybeVeloEdit();
   seq->maybeNextBack();
   seq->maybeNextTrack();
+  seq->maybeEraseAllFromTrack();
+  seq->maybeRandomTrack();
 }
